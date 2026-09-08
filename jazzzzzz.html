@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Column Compare — Find New Entries</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --success: #16a34a;
+    --success-bg: #f0fdf4;
+    --warn: #d97706;
+    --warn-bg: #fffbeb;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 24px 16px 60px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+  header { margin-bottom: 20px; }
+  header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  header p { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .col h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .badge {
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    background: var(--bg); border: 1px solid var(--border);
+    padding: 1px 8px; border-radius: 999px;
+  }
+  .col p.hint { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+  textarea {
+    width: 100%;
+    height: 260px;
+    padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    resize: vertical;
+    background: #fbfdff;
+    color: var(--text);
+    outline: none;
+  }
+  textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+  .col-check { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+  .col-check input { cursor: pointer; }
+  .options {
+    display: flex; flex-wrap: wrap; gap: 20px;
+    margin-top: 16px; align-items: center; justify-content: center;
+  }
+  .options label { display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--text); cursor: pointer; user-select: none; }
+  .options input[type=checkbox] { accent-color: var(--primary); width: 15px; height: 15px; cursor: pointer; }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; margin-bottom: 18px;
+  }
+  .stat {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px; text-align: center;
+  }
+  .stat .num { font-size: 22px; font-weight: 700; }
+  .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .stat.new .num { color: var(--success); }
+  .stat.match .num { color: var(--warn); }
+  .results { margin-top: 20px; }
+  .result-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .result-header h2 { font-size: 16px; font-weight: 700; }
+  .new-title { color: var(--success); }
+  .btn {
+    border: 1px solid var(--border); background: var(--card);
+    color: var(--text); padding: 7px 14px; border-radius: 8px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
+    transition: all .15s ease;
+  }
+  .btn:hover { border-color: var(--primary); color: var(--primary); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.primary:hover { background: var(--primary-hover); color: #fff; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .new-box {
+    background: var(--success-bg); border: 1px solid #bbf7d0;
+    border-radius: 8px; padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; white-space: pre-wrap; word-break: break-all;
+    min-height: 46px; max-height: 300px; overflow-y: auto;
+  }
+  .empty-note { color: var(--muted); font-style: italic; font-family: inherit; white-space: normal; }
+  details { margin-top: 14px; }
+  details summary {
+    cursor: pointer; font-size: 14px; font-weight: 600;
+    color: var(--warn); user-select: none; padding: 8px 12px;
+    background: var(--warn-bg); border: 1px solid #fde68a;
+    border-radius: 8px; display: inline-block;
+  }
+  details summary:hover { filter: brightness(0.97); }
+  .dup-box {
+    margin-top: 10px; background: var(--warn-bg); border: 1px solid #fde68a;
+    border-radius: 8px; padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; white-space: pre-wrap; word-break: break-all;
+    max-height: 220px; overflow-y: auto;
+  }
+  .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--text); color: #fff; padding: 10px 20px; border-radius: 999px;
+    font-size: 13.5px; opacity: 0; transition: all .3s ease; pointer-events: none; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  footer { margin-top: 26px; text-align: center; font-size: 12.5px; color: var(--muted); }
+  @media (max-width: 800px) {
+    .columns { grid-template-columns: 1fr; }
+    textarea { height: 180px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>📊 Column Compare</h1>
+    <p>Paste your existing data in <strong>Column 1</strong> and new data in <strong>Column 2</strong> — the app automatically shows only the Column&nbsp;2 entries that don't exist in Column&nbsp;1.</p>
+  </header>
+
+  <div class="columns">
+    <div class="card col">
+      <h2>Column 1 <span class="badge" id="count1">0 lines</span></h2>
+      <p class="hint">Your existing list — numbers, names, last names, MDs, ABAs… (one per line)</p>
+      <textarea id="col1" placeholder="e.g.&#10;12345&#10;John Smith&#10;jane.doe&#10;MD-2024-001&#10;ABA-7732" spellcheck="false"></textarea>
+      <label class="col-check"><input type="checkbox" id="header1"> First line is a header (skip it)</label>
+    </div>
+
+    <div class="card col">
+      <h2>Column 2 <span class="badge" id="count2">0 lines</span></h2>
+      <p class="hint">Your new list — anything not found in Column 1 will appear in the results below.</p>
+      <textarea id="col2" placeholder="e.g.&#10;12345&#10;Maria Garcia&#10;jane.doe&#10;MD-2025-014&#10;ABA-9911" spellcheck="false"></textarea>
+      <label class="col-check"><input type="checkbox" id="header2"> First line is a header (skip it)</label>
+    </div>
+  </div>
+
+  <div class="options card" style="margin-top: 20px; padding: 14px 20px;">
+    <label><input type="checkbox" id="ignoreCase" checked> Ignore case &nbsp;<small style="color:var(--muted)">(“John Smith” = “john smith”)</small></label>
+    <label><input type="checkbox" id="ignoreSpaces" checked> Ignore extra spaces &nbsp;<small style="color:var(--muted)">(trims &amp; collapses repeated spaces)</small></label>
+  </div>
+
+  <div class="results">
+    <div class="stats">
+      <div class="stat"><div class="num" id="statCol1">0</div><div class="lbl">Column 1 entries</div></div>
+      <div class="stat"><div class="num" id="statCol2">0</div><div class="lbl">Column 2 entries</div></div>
+      <div class="stat match"><div class="num" id="statMatch">0</div><div class="lbl">Matches (already in Col 1)</div></div>
+      <div class="stat new"><div class="num" id="statNew">0</div><div class="lbl">New entries</div></div>
+    </div>
+
+    <div class="card">
+      <div class="result-header">
+        <h2 class="new-title">✅ New entries (not in Column 1)</h2>
+        <div class="btn-row">
+          <button class="btn primary" id="copyBtn">📋 Copy new entries</button>
+        </div>
+      </div>
+      <div class="new-box" id="newBox"><span class="empty-note">New entries will appear here automatically as you type…</span></div>
+
+      <details>
+        <summary>🔁 Matched entries (already in Column 1) — <span id="dupCount">0</span></summary>
+        <div class="dup-box" id="dupBox"><span class="empty-note">No matches yet.</span></div>
+      </details>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="clearBtn">🗑 Clear all</button>
+    </div>
+  </div>
+
+  <footer>🔒 Everything is computed locally in your browser — your data never leaves this page. No server, no uploads.</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const col1 = document.getElementById('col1');
+  const col2 = document.getElementById('col2');
+  const header1 = document.getElementById('header1');
+  const header2 = document.getElementById('header2');
+  const ignoreCase = document.getElementById('ignoreCase');
+  const ignoreSpaces = document.getElementById('ignoreSpaces');
+  const newBox = document.getElementById('newBox');
+  const dupBox = document.getElementById('dupBox');
+  const dupCount = document.getElementById('dupCount');
+  const count1 = document.getElementById('count1');
+  const count2 = document.getElementById('count2');
+  const statCol1 = document.getElementById('statCol1');
+  const statCol2 = document.getElementById('statCol2');
+  const statMatch = document.getElementById('statMatch');
+  const statNew = document.getElementById('statNew');
+  const copyBtn = document.getElementById('copyBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const toast = document.getElementById('toast');
+
+  let newEntries = [];
+
+  function parseList(text, skipHeader) {
+    let lines = text.split(/\r?\n/);
+    if (skipHeader && lines.length > 0) lines = lines.slice(1);
+    // keep original (trimmed for display) but drop blank lines
+    return lines
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+  }
+
+  function normalize(entry) {
+    let v = entry;
+    if (ignoreSpaces.checked) v = v.replace(/\s+/g, ' ');
+    if (ignoreCase.checked) v = v.toLowerCase();
+    return v;
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+
+  function compare() {
+    const list1 = parseList(col1.value, header1.checked);
+    const list2 = parseList(col2.value, header2.checked);
+
+    const set1 = new Set(list1.map(normalize));
+
+    newEntries = [];
+    const matches = [];
+    const seenNew = new Set();
+
+    for (const entry of list2) {
+      const key = normalize(entry);
+      if (set1.has(key)) {
+        matches.push(entry);
+      } else {
+        newEntries.push(entry);
+        seenNew.add(key);
+      }
+    }
+
+    count1.textContent = list1.length + (list1.length === 1 ? ' line' : ' lines');
+    count2.textContent = list2.length + (list2.length === 1 ? ' line' : ' lines');
+    statCol1.textContent = list1.length;
+    statCol2.textContent = list2.length;
+    statMatch.textContent = matches.length;
+    statNew.textContent = newEntries.length;
+    dupCount.textContent = matches.length;
+
+    if (newEntries.length > 0) {
+      newBox.textContent = newEntries.join('\n');
+    } else if (list2.length > 0) {
+      newBox.innerHTML = '<span class="empty-note">Every entry in Column 2 already exists in Column 1 — nothing new. 🎉</span>';
+    } else {
+      newBox.innerHTML = '<span class="empty-note">New entries will appear here automatically as you type…</span>';
+    }
+
+    if (matches.length > 0) {
+      dupBox.textContent = matches.join('\n');
+    } else {
+      dupBox.innerHTML = '<span class="empty-note">No matches yet.</span>';
+    }
+  }
+
+  let timer = null;
+  function scheduleCompare() {
+    clearTimeout(timer);
+    timer = setTimeout(compare, 150);
+  }
+
+  [col1, col2].forEach(t => t.addEventListener('input', scheduleCompare));
+  [header1, header2, ignoreCase, ignoreSpaces].forEach(cb => cb.addEventListener('change', compare));
+
+  copyBtn.addEventListener('click', function () {
+    if (newEntries.length === 0) { showToast('Nothing to copy'); return; }
+    const text = newEntries.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => showToast('Copied ' + newEntries.length + ' new entries ✔'),
+        () => fallbackCopy(text)
+      );
+    } else {
+      fallbackCopy(text);
+    }
+  });
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showToast('Copied ' + newEntries.length + ' new entries ✔');
+    } catch (e) {
+      showToast('Copy failed — please select manually');
+    }
+    document.body.removeChild(ta);
+  }
+
+  clearBtn.addEventListener('click', function () {
+    if (col1.value === '' && col2.value === '') return;
+    if (confirm('Clear both columns?')) {
+      col1.value = '';
+      col2.value = '';
+      compare();
+    }
+  });
+
+  compare();
+})();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
